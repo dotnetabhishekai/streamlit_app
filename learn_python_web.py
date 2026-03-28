@@ -496,7 +496,7 @@ selected_idx = st.sidebar.radio("Select a lesson:", range(len(LESSONS)),
                                  label_visibility="collapsed")
 
 st.sidebar.divider()
-st.sidebar.caption("Made by [dotnetabhishekai](https://github.com/dotnetabhishekai)")
+st.sidebar.caption("Made by [dotnetabhishekai](https://dotnetabhishek.com)")
 
 # Main content
 lesson = LESSONS[selected_idx]
