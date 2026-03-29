@@ -479,124 +479,168 @@ if "completed" not in st.session_state:
 if "quiz_answered" not in st.session_state:
     st.session_state.quiz_answered = {}
 
-# Sidebar — lesson navigation
+# ---------------------------------------------------------------------------
+# Practice Projects Data (defined here so sidebar can reference it)
+# ---------------------------------------------------------------------------
+PROJECTS = [
+    {
+        "title": "📒 Project 1: Student Grade Manager",
+        "description": "A complete student grade management system using classes, file I/O, dictionaries, error handling, and comprehensions.",
+        "concepts": "Variables, Strings, Numbers, Lists, Dicts, Conditionals, Loops, Functions, Classes, Error Handling, Comprehensions, File Handling, Type Hints",
+        "code": "placeholder",
+    },
+    {
+        "title": "🏦 Project 2: Bank Account System",
+        "description": "A banking system with accounts, transactions, interest calculation, and CSV export using OOP, decorators, context managers, and async.",
+        "concepts": "Classes, Inheritance, Decorators, Context Managers, Error Handling, Generators, Dataclasses, File I/O, Comprehensions, Type Hints, Lambda",
+        "code": "placeholder",
+    },
+    {
+        "title": "📊 Project 3: Data Pipeline & Report Generator",
+        "description": "A mini ETL pipeline that loads CSV data, transforms it, generates statistics, and produces a formatted report — using every concept from all 20 lessons.",
+        "concepts": "All 20 lessons",
+        "code": "placeholder",
+    },
+]
+
+# Sidebar — mode toggle + navigation
 st.sidebar.title("🐍 Learn Python")
 st.sidebar.markdown("20 interactive lessons & 3 practice projects")
 st.sidebar.divider()
 
-completed_count = len(st.session_state.completed)
-st.sidebar.progress(completed_count / len(LESSONS), text=f"Progress: {completed_count}/{len(LESSONS)}")
+app_mode = st.sidebar.radio("Choose mode:", ["📚 Lessons", "🛠️ Practice Projects"], index=0)
 
-lesson_titles = []
-for i, lesson in enumerate(LESSONS):
-    icon = "✅" if i in st.session_state.completed else "📘" if i < 10 else "🚀"
-    lesson_titles.append(f"{icon} {lesson['title']}")
+st.sidebar.divider()
 
-selected_idx = st.sidebar.radio("Select a lesson:", range(len(LESSONS)),
-                                 format_func=lambda i: lesson_titles[i],
-                                 label_visibility="collapsed")
+if app_mode == "📚 Lessons":
+    completed_count = len(st.session_state.completed)
+    st.sidebar.progress(completed_count / len(LESSONS), text=f"Progress: {completed_count}/{len(LESSONS)}")
+
+    lesson_titles = []
+    for i, lesson in enumerate(LESSONS):
+        icon = "✅" if i in st.session_state.completed else "📘" if i < 10 else "🚀"
+        lesson_titles.append(f"{icon} {lesson['title']}")
+
+    def _resolve_idx(val):
+        """Resolve current lesson index from session state value."""
+        if isinstance(val, int):
+            return val
+        if val in lesson_titles:
+            return lesson_titles.index(val)
+        # Icon may have changed (📘→✅), match by lesson title text
+        for i, t in enumerate(lesson_titles):
+            if t[2:] == str(val)[2:]:  # skip icon prefix
+                return i
+        return 0
+
+    def go_prev():
+        current = _resolve_idx(st.session_state.get("lesson_radio", 0))
+        if current > 0:
+            st.session_state.lesson_radio = lesson_titles[current - 1]
+
+    def go_next():
+        current = _resolve_idx(st.session_state.get("lesson_radio", 0))
+        if current < len(LESSONS) - 1:
+            st.session_state.lesson_radio = lesson_titles[current + 1]
+
+    # Fix stale session value if icon changed
+    stored = st.session_state.get("lesson_radio")
+    if stored and stored not in lesson_titles:
+        idx = _resolve_idx(stored)
+        st.session_state.lesson_radio = lesson_titles[idx]
+
+    selected_title = st.sidebar.radio("Select a lesson:", lesson_titles,
+                                       key="lesson_radio",
+                                       label_visibility="collapsed")
+    selected_idx = lesson_titles.index(selected_title) if selected_title in lesson_titles else 0
+else:
+    selected_idx = 0
+    project_choice = st.sidebar.radio(
+        "Select a project:",
+        [p["title"] for p in PROJECTS],
+        label_visibility="collapsed",
+    )
 
 st.sidebar.divider()
 st.sidebar.caption("Made by [dotnetabhishekai](https://github.com/dotnetabhishekai)")
 
 # Main content
-lesson = LESSONS[selected_idx]
+if app_mode == "📚 Lessons":
+    lesson = LESSONS[selected_idx]
 
-st.title(f"{lesson['title']} — {lesson['topic']}")
+    st.title(f"{lesson['title']} — {lesson['topic']}")
 
-# Tabs
-tab_theory, tab_code, tab_quiz = st.tabs(["📖 Theory", "💻 Code Editor", "❓ Quiz"])
+    tab_theory, tab_code, tab_quiz = st.tabs(["📖 Theory", "💻 Code Editor", "❓ Quiz"])
 
-# Theory tab
-with tab_theory:
-    st.markdown(lesson["theory"])
-    st.divider()
-    st.subheader("Example Code")
-    st.code(lesson["example"], language="python")
+    with tab_theory:
+        st.markdown(lesson["theory"])
+        st.divider()
+        st.subheader("Example Code")
+        st.code(lesson["example"], language="python")
+        if st.button("▶️ Run Example", key=f"run_example_{selected_idx}"):
+            output, error = run_code_safely(lesson["example"])
+            if output:
+                st.success("Output:")
+                st.code(output, language="text")
+            if error:
+                st.error("Error:")
+                st.code(error, language="text")
 
-    if st.button("▶️ Run Example", key=f"run_example_{selected_idx}"):
-        output, error = run_code_safely(lesson["example"])
-        if output:
-            st.success("Output:")
-            st.code(output, language="text")
-        if error:
-            st.error("Error:")
-            st.code(error, language="text")
+    with tab_code:
+        st.info(f"**Exercise:** {lesson['exercise']}")
+        code = st.text_area("Write your code here:", height=200, key=f"code_editor_{selected_idx}", placeholder="Type your Python code...")
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            run_clicked = st.button("▶️ Run Code", key=f"run_code_{selected_idx}", type="primary")
+        with col2:
+            hint_clicked = st.button("💡 Show Hint", key=f"hint_{selected_idx}")
+        with col3:
+            if st.button("✅ Mark Complete", key=f"complete_{selected_idx}"):
+                st.session_state.completed.add(selected_idx)
+                st.rerun()
+        if run_clicked and code.strip():
+            output, error = run_code_safely(code)
+            if output:
+                st.success("Output:")
+                st.code(output, language="text")
+            if error:
+                st.error("Error:")
+                st.code(error, language="text")
+            if not output and not error:
+                st.warning("No output produced.")
+        if hint_clicked:
+            st.markdown("**Hint:**")
+            st.code(lesson["hint"], language="python")
 
-# Code Editor tab
-with tab_code:
-    st.info(f"**Exercise:** {lesson['exercise']}")
-
-    code = st.text_area("Write your code here:", height=200,
-                        key=f"code_editor_{selected_idx}",
-                        placeholder="Type your Python code...")
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    with col1:
-        run_clicked = st.button("▶️ Run Code", key=f"run_code_{selected_idx}", type="primary")
-    with col2:
-        hint_clicked = st.button("💡 Show Hint", key=f"hint_{selected_idx}")
-    with col3:
-        if st.button("✅ Mark Complete", key=f"complete_{selected_idx}"):
-            st.session_state.completed.add(selected_idx)
-            st.rerun()
-
-    if run_clicked and code.strip():
-        output, error = run_code_safely(code)
-        if output:
-            st.success("Output:")
-            st.code(output, language="text")
-        if error:
-            st.error("Error:")
-            st.code(error, language="text")
-        if not output and not error:
-            st.warning("No output produced.")
-
-    if hint_clicked:
-        st.markdown("**Hint:**")
-        st.code(lesson["hint"], language="python")
-
-# Quiz tab
-with tab_quiz:
-    st.subheader(lesson["quiz_q"])
-
-    quiz_key = f"quiz_{selected_idx}"
-    answer = st.radio("Choose your answer:", lesson["quiz_opts"],
-                       key=f"quiz_radio_{selected_idx}",
-                       index=None)
-
-    if st.button("Submit Answer", key=f"quiz_submit_{selected_idx}"):
-        if answer is None:
-            st.warning("Please select an answer.")
-        else:
-            selected_opt_idx = lesson["quiz_opts"].index(answer)
-            if selected_opt_idx == lesson["quiz_ans"]:
-                st.success(f"✅ Correct! {lesson['quiz_exp']}")
-                st.session_state.quiz_answered[selected_idx] = True
+    with tab_quiz:
+        st.subheader(lesson["quiz_q"])
+        answer = st.radio("Choose your answer:", lesson["quiz_opts"], key=f"quiz_radio_{selected_idx}", index=None)
+        if st.button("Submit Answer", key=f"quiz_submit_{selected_idx}"):
+            if answer is None:
+                st.warning("Please select an answer.")
             else:
-                correct = lesson["quiz_opts"][lesson["quiz_ans"]]
-                st.error(f"❌ Not quite. The answer is: **{correct}**\n\n{lesson['quiz_exp']}")
-                st.session_state.quiz_answered[selected_idx] = False
+                selected_opt_idx = lesson["quiz_opts"].index(answer)
+                if selected_opt_idx == lesson["quiz_ans"]:
+                    st.success(f"✅ Correct! {lesson['quiz_exp']}")
+                    st.session_state.quiz_answered[selected_idx] = True
+                else:
+                    correct = lesson["quiz_opts"][lesson["quiz_ans"]]
+                    st.error(f"❌ Not quite. The answer is: **{correct}**\n\n{lesson['quiz_exp']}")
+                    st.session_state.quiz_answered[selected_idx] = False
 
-# Navigation
-st.divider()
-col_prev, col_spacer, col_next = st.columns([1, 3, 1])
-with col_prev:
-    if selected_idx > 0:
-        if st.button("← Previous"):
-            st.session_state[f"quiz_radio_{selected_idx}"] = None
-            st.rerun()
-with col_next:
-    if selected_idx < len(LESSONS) - 1:
-        if st.button("Next →"):
-            st.session_state[f"quiz_radio_{selected_idx}"] = None
-            st.rerun()
+    st.divider()
+    col_prev, col_spacer, col_next = st.columns([1, 3, 1])
+    with col_prev:
+        if selected_idx > 0:
+            st.button("← Previous", on_click=go_prev)
+    with col_next:
+        if selected_idx < len(LESSONS) - 1:
+            st.button("Next →", on_click=go_next)
 
 # ---------------------------------------------------------------------------
-# Practice Projects Section
+# Practice Projects — Full Code (updates placeholder entries above)
 # ---------------------------------------------------------------------------
-PROJECTS = [
+_PROJECT_CODES = [
     {
         "title": "📒 Project 1: Student Grade Manager",
         "description": "A complete student grade management system using classes, file I/O, dictionaries, error handling, and comprehensions.",
@@ -1103,32 +1147,24 @@ main()
     },
 ]
 
-# Add projects to sidebar
-st.sidebar.divider()
-st.sidebar.subheader("🛠️ Practice Projects")
-project_choice = st.sidebar.radio(
-    "Select a project:",
-    ["None"] + [p["title"] for p in PROJECTS],
-    label_visibility="collapsed",
-)
+# Populate PROJECTS with full code
+for i, pc in enumerate(_PROJECT_CODES):
+    PROJECTS[i].update(pc)
 
-# Show project if selected
-if project_choice != "None":
+# (sidebar already handled above)
+
+# Show project if in project mode
+if app_mode == "🛠️ Practice Projects":
     project = next(p for p in PROJECTS if p["title"] == project_choice)
 
-    # Auto-scroll to project section using JS
     st.components.v1.html(
         """<script>
-        const el = document.getElementById('project-section');
-        if (el) { el.scrollIntoView({behavior: 'smooth'}); }
-        else { setTimeout(() => { window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'}); }, 200); }
+        setTimeout(() => { window.scrollTo({top: 0, behavior: 'smooth'}); }, 100);
         </script>""",
         height=0,
     )
 
-    st.divider()
-    st.markdown('<div id="project-section"></div>', unsafe_allow_html=True)
-    st.header(project["title"])
+    st.title(project["title"])
     st.markdown(project["description"])
     st.caption(f"**Concepts used:** {project['concepts']}")
 
@@ -1142,26 +1178,14 @@ if project_choice != "None":
 
     with proj_tab_editor:
         st.info("Write your own implementation below. Use the reference code tab for guidance.")
-
         editor_key = f"proj_editor_{project_choice}"
         default_code = st.session_state.get(editor_key, f"# {project['title']}\n# Try writing your own version here!\n\n")
-
-        user_code = st.text_area(
-            "Your code:",
-            value=default_code,
-            height=400,
-            key=f"proj_textarea_{project_choice}",
-            placeholder="Write your Python code here...",
-        )
-
+        user_code = st.text_area("Your code:", value=default_code, height=400, key=f"proj_textarea_{project_choice}", placeholder="Write your Python code here...")
         ed_col1, ed_col2, ed_col3 = st.columns([1, 1, 2])
         with ed_col1:
             run_user = st.button("▶️ Run Your Code", key=f"run_user_proj_{project_choice}", type="primary")
         with ed_col2:
             clear_user = st.button("🗑 Clear", key=f"clear_proj_{project_choice}")
-        with ed_col3:
-            pass
-
         if run_user and user_code.strip():
             output, error = run_code_safely(user_code)
             if output:
@@ -1172,7 +1196,6 @@ if project_choice != "None":
                 st.code(error, language="text")
             if not output and not error:
                 st.warning("No output produced. Make sure your code calls print() or a main() function.")
-
         if clear_user:
             st.session_state[editor_key] = ""
             st.rerun()
