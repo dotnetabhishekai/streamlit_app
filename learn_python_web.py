@@ -460,7 +460,8 @@ def run_code_safely(code: str) -> tuple[str, str]:
     sys.stdout = captured_out = io.StringIO()
     sys.stderr = captured_err = io.StringIO()
     try:
-        exec(code, {"__builtins__": __builtins__}, {})
+        exec_globals = {"__builtins__": __builtins__}
+        exec(code, exec_globals)
     except Exception:
         traceback.print_exc(file=captured_err)
     finally:
@@ -480,7 +481,7 @@ if "quiz_answered" not in st.session_state:
 
 # Sidebar — lesson navigation
 st.sidebar.title("🐍 Learn Python")
-st.sidebar.markdown("20 interactive lessons")
+st.sidebar.markdown("20 interactive lessons & 3 practice projects")
 st.sidebar.divider()
 
 completed_count = len(st.session_state.completed)
@@ -496,7 +497,7 @@ selected_idx = st.sidebar.radio("Select a lesson:", range(len(LESSONS)),
                                  label_visibility="collapsed")
 
 st.sidebar.divider()
-st.sidebar.caption("Made by [dotnetabhishekai](https://dotnetabhishek.com)")
+st.sidebar.caption("Made by [dotnetabhishekai](https://github.com/dotnetabhishekai)")
 
 # Main content
 lesson = LESSONS[selected_idx]
@@ -591,6 +592,600 @@ with col_next:
         if st.button("Next →"):
             st.session_state[f"quiz_radio_{selected_idx}"] = None
             st.rerun()
+
+# ---------------------------------------------------------------------------
+# Practice Projects Section
+# ---------------------------------------------------------------------------
+PROJECTS = [
+    {
+        "title": "📒 Project 1: Student Grade Manager",
+        "description": "A complete student grade management system using classes, file I/O, dictionaries, error handling, and comprehensions.",
+        "concepts": "Variables, Strings, Numbers, Lists, Dicts, Conditionals, Loops, Functions, Classes, Error Handling, Comprehensions, File Handling, Type Hints",
+        "code": '''"""Student Grade Manager — Uses concepts from Lessons 1-19"""
+from dataclasses import dataclass, field
+from typing import Optional
+import json
+import os
+
+# --- Data Model (Lesson 11: Classes, Lesson 18: Dataclasses, Lesson 19: Type Hints) ---
+@dataclass
+class Student:
+    name: str
+    student_id: str
+    grades: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def average(self) -> float:
+        return sum(self.grades.values()) / len(self.grades) if self.grades else 0.0
+
+    @property
+    def letter_grade(self) -> str:
+        avg = self.average
+        if avg >= 90: return "A"
+        elif avg >= 80: return "B"
+        elif avg >= 70: return "C"
+        elif avg >= 60: return "D"
+        return "F"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.student_id}) — Avg: {self.average:.1f} ({self.letter_grade})"
+
+
+# --- Grade Manager (Lesson 8: Functions, Lesson 12: Error Handling) ---
+class GradeManager:
+    def __init__(self, filename: str = "grades.json"):
+        self.students: dict[str, Student] = {}
+        self.filename = filename
+
+    def add_student(self, name: str, student_id: str) -> Student:
+        if student_id in self.students:
+            raise ValueError(f"Student {student_id} already exists")
+        student = Student(name=name, student_id=student_id)
+        self.students[student_id] = student
+        return student
+
+    def add_grade(self, student_id: str, subject: str, score: float) -> None:
+        if student_id not in self.students:
+            raise KeyError(f"Student {student_id} not found")
+        if not 0 <= score <= 100:
+            raise ValueError(f"Score must be 0-100, got {score}")
+        self.students[student_id].grades[subject] = score
+
+    # Lesson 15: Generator
+    def failing_students(self):
+        for s in self.students.values():
+            if s.average < 60 and s.grades:
+                yield s
+
+    # Lesson 13: Comprehensions
+    def class_stats(self) -> dict[str, float]:
+        averages = [s.average for s in self.students.values() if s.grades]
+        if not averages:
+            return {"count": 0, "avg": 0, "highest": 0, "lowest": 0}
+        return {
+            "count": len(averages),
+            "avg": round(sum(averages) / len(averages), 1),
+            "highest": round(max(averages), 1),
+            "lowest": round(min(averages), 1),
+        }
+
+    # Lesson 10: File Handling
+    def save(self) -> None:
+        data = {sid: {"name": s.name, "grades": s.grades} for sid, s in self.students.items()}
+        with open(self.filename, "w") as f:
+            json.dump(data, f, indent=2)
+
+    def load(self) -> None:
+        try:
+            with open(self.filename) as f:
+                data = json.load(f)
+            for sid, info in data.items():
+                student = Student(name=info["name"], student_id=sid, grades=info["grades"])
+                self.students[sid] = student
+        except FileNotFoundError:
+            pass
+
+
+# --- Main Program (Lesson 7: Loops, Lesson 6: Conditionals) ---
+def main():
+    mgr = GradeManager()
+
+    # Add students
+    mgr.add_student("Alice Johnson", "S001")
+    mgr.add_student("Bob Smith", "S002")
+    mgr.add_student("Charlie Brown", "S003")
+    mgr.add_student("Diana Lee", "S004")
+
+    # Add grades (Lesson 4: Numbers)
+    subjects = {"Math": [92, 78, 55, 88], "Science": [85, 65, 48, 95], "English": [90, 72, 60, 82]}
+    student_ids = ["S001", "S002", "S003", "S004"]
+
+    for subject, scores in subjects.items():
+        for sid, score in zip(student_ids, scores):
+            mgr.add_grade(sid, subject, score)
+
+    # Print all students (Lesson 3: Strings, f-strings)
+    print("=== Student Report ===")
+    for student in mgr.students.values():
+        print(f"  {student}")
+        for subj, grade in student.grades.items():
+            print(f"    {subj}: {grade}")
+
+    # Class stats
+    stats = mgr.class_stats()
+    print(f"\\nClass Average: {stats['avg']}, Highest: {stats['highest']}, Lowest: {stats['lowest']}")
+
+    # Failing students (Lesson 15: Generators)
+    print("\\nFailing students:")
+    for s in mgr.failing_students():
+        print(f"  ⚠️ {s.name} — {s.average:.1f}")
+
+    # Top students per subject (Lesson 16: Lambda, Lesson 13: Comprehensions)
+    print("\\nTop student per subject:")
+    for subject in subjects:
+        top = max(mgr.students.values(), key=lambda s: s.grades.get(subject, 0))
+        print(f"  {subject}: {top.name} ({top.grades[subject]})")
+
+    # Save (Lesson 10: File I/O)
+    mgr.save()
+    print(f"\\nSaved to {mgr.filename}")
+
+    # Cleanup
+    if os.path.exists(mgr.filename):
+        os.remove(mgr.filename)
+
+main()
+''',
+    },
+    {
+        "title": "🏦 Project 2: Bank Account System",
+        "description": "A banking system with accounts, transactions, interest calculation, and CSV export using OOP, decorators, context managers, and async.",
+        "concepts": "Classes, Inheritance, Decorators, Context Managers, Error Handling, Generators, Dataclasses, File I/O, Comprehensions, Type Hints, Lambda",
+        "code": '''"""Bank Account System — Uses concepts from Lessons 1-20"""
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional
+from functools import wraps
+from contextlib import contextmanager
+import csv
+import os
+
+# --- Decorator (Lesson 14) ---
+def log_transaction(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        result = func(self, *args, **kwargs)
+        print(f"  [LOG] {func.__name__} on {self.account_id}: args={args} → balance={self.balance:.2f}")
+        return result
+    return wrapper
+
+# --- Data Models (Lesson 18: Dataclasses) ---
+@dataclass
+class Transaction:
+    timestamp: str
+    type: str
+    amount: float
+    balance_after: float
+    description: str = ""
+
+@dataclass
+class BankAccount:
+    owner: str
+    account_id: str
+    balance: float = 0.0
+    account_type: str = "checking"
+    transactions: list[Transaction] = field(default_factory=list)
+
+    def _record(self, txn_type: str, amount: float, desc: str = "") -> Transaction:
+        txn = Transaction(
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            type=txn_type, amount=amount,
+            balance_after=self.balance, description=desc
+        )
+        self.transactions.append(txn)
+        return txn
+
+    # Lesson 14: Decorator
+    @log_transaction
+    def deposit(self, amount: float) -> float:
+        if amount <= 0:
+            raise ValueError("Deposit must be positive")
+        self.balance += amount
+        self._record("deposit", amount)
+        return self.balance
+
+    @log_transaction
+    def withdraw(self, amount: float) -> float:
+        if amount <= 0:
+            raise ValueError("Withdrawal must be positive")
+        if amount > self.balance:
+            raise ValueError(f"Insufficient funds: {self.balance:.2f} available")
+        self.balance -= amount
+        self._record("withdrawal", amount)
+        return self.balance
+
+    # Lesson 15: Generator
+    def large_transactions(self, threshold: float = 500):
+        for txn in self.transactions:
+            if txn.amount >= threshold:
+                yield txn
+
+    def __str__(self) -> str:
+        return f"[{self.account_id}] {self.owner} — ${self.balance:,.2f} ({self.account_type})"
+
+# --- Savings Account (Lesson 11: Inheritance) ---
+class SavingsAccount(BankAccount):
+    def __init__(self, owner: str, account_id: str, interest_rate: float = 0.02, **kwargs):
+        super().__init__(owner=owner, account_id=account_id, account_type="savings", **kwargs)
+        self.interest_rate = interest_rate
+
+    def apply_interest(self) -> float:
+        interest = self.balance * self.interest_rate
+        self.balance += interest
+        self._record("interest", interest, f"Rate: {self.interest_rate:.1%}")
+        print(f"  [LOG] Interest ${interest:.2f} applied to {self.account_id}")
+        return interest
+
+# --- Context Manager (Lesson 17) ---
+@contextmanager
+def bank_session(account: BankAccount):
+    print(f"\\n--- Session opened for {account.owner} ---")
+    starting = account.balance
+    try:
+        yield account
+    except ValueError as e:
+        print(f"  ⚠️ Transaction failed: {e}")
+    finally:
+        diff = account.balance - starting
+        sign = "+" if diff >= 0 else ""
+        print(f"--- Session closed ({sign}${diff:.2f}) ---")
+
+# --- Export (Lesson 10: File I/O) ---
+def export_transactions(account: BankAccount, filename: str) -> None:
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["timestamp", "type", "amount", "balance_after", "description"])
+        for txn in account.transactions:
+            writer.writerow([txn.timestamp, txn.type, txn.amount, txn.balance_after, txn.description])
+    print(f"Exported {len(account.transactions)} transactions to {filename}")
+
+# --- Main (Lesson 7: Loops, Lesson 12: Error Handling) ---
+def main():
+    checking = BankAccount("Alice", "CHK-001")
+    savings = SavingsAccount("Alice", "SAV-001", interest_rate=0.03, balance=1000)
+
+    # Lesson 17: Context manager
+    with bank_session(checking):
+        checking.deposit(2500)
+        checking.deposit(750)
+        checking.withdraw(300)
+        checking.withdraw(150)
+
+    with bank_session(savings):
+        savings.deposit(500)
+        savings.apply_interest()
+
+    # Try invalid withdrawal (Lesson 12: Error Handling)
+    with bank_session(checking):
+        checking.withdraw(99999)
+
+    # Lesson 13: Comprehensions
+    all_accounts = [checking, savings]
+    total_assets = sum(a.balance for a in all_accounts)
+    print(f"\\nTotal assets: ${total_assets:,.2f}")
+
+    # Lesson 15: Generator — large transactions
+    print("\\nLarge transactions (>$500):")
+    for txn in checking.large_transactions(500):
+        print(f"  {txn.type}: ${txn.amount:.2f} on {txn.timestamp}")
+
+    # Lesson 16: Lambda sort
+    all_txns = sorted(checking.transactions, key=lambda t: t.amount, reverse=True)
+    print(f"\\nLargest transaction: {all_txns[0].type} ${all_txns[0].amount:.2f}")
+
+    # Export
+    export_transactions(checking, "checking_txns.csv")
+    if os.path.exists("checking_txns.csv"):
+        with open("checking_txns.csv") as f:
+            print(f.read())
+        os.remove("checking_txns.csv")
+
+main()
+''',
+    },
+    {
+        "title": "📊 Project 3: Data Pipeline & Report Generator",
+        "description": "A mini ETL pipeline that loads CSV data, transforms it, generates statistics, and produces a formatted report — using every concept from all 20 lessons.",
+        "concepts": "All 20 lessons: Variables, Strings, Numbers, Lists, Dicts, Conditionals, Loops, Functions, Dicts, File I/O, Classes, Error Handling, Comprehensions, Decorators, Generators, Lambda, Context Managers, Dataclasses, Type Hints, Async",
+        "code": '''"""Data Pipeline & Report Generator — Uses ALL 20 lesson concepts"""
+import csv
+import json
+import os
+import asyncio
+from dataclasses import dataclass, field
+from typing import Optional
+from functools import wraps, reduce
+from contextlib import contextmanager
+from datetime import datetime
+
+# === Lesson 14: Decorator — timing ===
+def timed(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        import time
+        start = time.time()
+        result = func(*args, **kwargs)
+        print(f"  ⏱ {func.__name__}: {time.time()-start:.4f}s")
+        return result
+    return wrapper
+
+# === Lesson 18: Dataclasses ===
+@dataclass
+class SalesRecord:
+    date: str
+    product: str
+    category: str
+    quantity: int
+    price: float
+    region: str
+
+    @property
+    def revenue(self) -> float:
+        return self.quantity * self.price
+
+@dataclass
+class ReportStats:
+    total_records: int = 0
+    total_revenue: float = 0.0
+    avg_order_value: float = 0.0
+    top_product: str = ""
+    top_region: str = ""
+    categories: dict = field(default_factory=dict)
+
+# === Lesson 17: Context Manager ===
+@contextmanager
+def pipeline_stage(name: str):
+    print(f"\\n{'='*40}")
+    print(f"  Stage: {name}")
+    print(f"{'='*40}")
+    try:
+        yield
+    except Exception as e:
+        print(f"  ❌ Stage failed: {e}")
+        raise
+    else:
+        print(f"  ✅ {name} complete")
+
+# === Lesson 10: File I/O — Generate sample data ===
+def generate_sample_csv(filename: str, n: int = 50) -> str:
+    import random
+    random.seed(42)
+    products = {
+        "Laptop": ("Electronics", 899.99), "Phone": ("Electronics", 699.99),
+        "Headphones": ("Electronics", 79.99), "Desk": ("Furniture", 249.99),
+        "Chair": ("Furniture", 199.99), "Book": ("Education", 29.99),
+        "Course": ("Education", 49.99), "Pen Set": ("Stationery", 12.99),
+    }
+    regions = ["North", "South", "East", "West"]
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["date", "product", "category", "quantity", "price", "region"])
+        for i in range(n):
+            prod = random.choice(list(products.keys()))
+            cat, price = products[prod]
+            writer.writerow([
+                f"2025-{random.randint(1,12):02d}-{random.randint(1,28):02d}",
+                prod, cat, random.randint(1, 20), price, random.choice(regions)
+            ])
+    return filename
+
+# === Lesson 8: Functions + Lesson 12: Error Handling ===
+@timed
+def load_data(filename: str) -> list[SalesRecord]:
+    records = []
+    try:
+        with open(filename) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                records.append(SalesRecord(
+                    date=row["date"], product=row["product"],
+                    category=row["category"],
+                    quantity=int(row["quantity"]),
+                    price=float(row["price"]),
+                    region=row["region"]
+                ))
+    except FileNotFoundError:
+        print("  File not found!")
+    except (ValueError, KeyError) as e:
+        print(f"  Data error: {e}")
+    print(f"  Loaded {len(records)} records")
+    return records
+
+# === Lesson 13: Comprehensions + Lesson 16: Lambda ===
+@timed
+def analyze(records: list[SalesRecord]) -> ReportStats:
+    if not records:
+        return ReportStats()
+
+    revenues = [r.revenue for r in records]
+    total = sum(revenues)
+
+    # Lesson 9: Dictionaries
+    product_rev: dict[str, float] = {}
+    region_rev: dict[str, float] = {}
+    cat_rev: dict[str, float] = {}
+
+    for r in records:
+        product_rev[r.product] = product_rev.get(r.product, 0) + r.revenue
+        region_rev[r.region] = region_rev.get(r.region, 0) + r.revenue
+        cat_rev[r.category] = cat_rev.get(r.category, 0) + r.revenue
+
+    # Lesson 16: Lambda
+    top_product = max(product_rev, key=lambda p: product_rev[p])
+    top_region = max(region_rev, key=lambda r: region_rev[r])
+
+    # Lesson 16: Reduce
+    biggest_order = reduce(lambda a, b: a if a.revenue > b.revenue else b, records)
+    print(f"  Biggest single order: {biggest_order.product} ${biggest_order.revenue:.2f}")
+
+    return ReportStats(
+        total_records=len(records),
+        total_revenue=round(total, 2),
+        avg_order_value=round(total / len(records), 2),
+        top_product=top_product,
+        top_region=top_region,
+        categories={k: round(v, 2) for k, v in sorted(cat_rev.items(), key=lambda x: -x[1])},
+    )
+
+# === Lesson 15: Generator ===
+def high_value_orders(records: list[SalesRecord], threshold: float = 1000):
+    for r in records:
+        if r.revenue >= threshold:
+            yield r
+
+# === Lesson 20: Async ===
+async def async_export(stats: ReportStats, filename: str):
+    print(f"  Exporting to {filename}...")
+    await asyncio.sleep(0.05)  # simulate I/O
+    report = f"Sales Report — {datetime.now().strftime(\'%Y-%m-%d\')}\\n"
+    report += f"{'='*40}\\n"
+    report += f"Total Records: {stats.total_records}\\n"
+    report += f"Total Revenue: ${stats.total_revenue:,.2f}\\n"
+    report += f"Avg Order Value: ${stats.avg_order_value:,.2f}\\n"
+    report += f"Top Product: {stats.top_product}\\n"
+    report += f"Top Region: {stats.top_region}\\n\\n"
+    report += "Revenue by Category:\\n"
+    for cat, rev in stats.categories.items():
+        bar = "█" * int(rev / max(stats.categories.values()) * 20)
+        report += f"  {cat:15s} ${rev:>10,.2f} {bar}\\n"
+    with open(filename, "w") as f:
+        f.write(report)
+    return report
+
+async def run_exports(stats):
+    report = await asyncio.gather(
+        async_export(stats, "sales_report.txt"),
+    )
+    return report[0]
+
+# === Main Pipeline ===
+def main():
+    csv_file = "sample_sales.csv"
+
+    with pipeline_stage("Generate Data"):
+        generate_sample_csv(csv_file, 50)
+
+    with pipeline_stage("Load & Parse"):
+        records = load_data(csv_file)
+
+    with pipeline_stage("Analyze"):
+        stats = analyze(records)
+
+    with pipeline_stage("High-Value Orders"):
+        hv = list(high_value_orders(records, 2000))
+        print(f"  Found {len(hv)} orders over $2,000:")
+        for r in hv[:5]:
+            print(f"    {r.product}: {r.quantity} × ${r.price} = ${r.revenue:,.2f} ({r.region})")
+
+    with pipeline_stage("Export Report"):
+        report_text = asyncio.run(run_exports(stats))
+        print(report_text)
+
+    # Cleanup
+    for f in [csv_file, "sales_report.txt"]:
+        if os.path.exists(f):
+            os.remove(f)
+
+    print("\\n🎉 Pipeline complete!")
+
+main()
+''',
+    },
+]
+
+# Add projects to sidebar
+st.sidebar.divider()
+st.sidebar.subheader("🛠️ Practice Projects")
+project_choice = st.sidebar.radio(
+    "Select a project:",
+    ["None"] + [p["title"] for p in PROJECTS],
+    label_visibility="collapsed",
+)
+
+# Show project if selected
+if project_choice != "None":
+    project = next(p for p in PROJECTS if p["title"] == project_choice)
+
+    # Auto-scroll to project section using JS
+    st.components.v1.html(
+        """<script>
+        const el = document.getElementById('project-section');
+        if (el) { el.scrollIntoView({behavior: 'smooth'}); }
+        else { setTimeout(() => { window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'}); }, 200); }
+        </script>""",
+        height=0,
+    )
+
+    st.divider()
+    st.markdown('<div id="project-section"></div>', unsafe_allow_html=True)
+    st.header(project["title"])
+    st.markdown(project["description"])
+    st.caption(f"**Concepts used:** {project['concepts']}")
+
+    proj_tab_code, proj_tab_editor, proj_tab_run = st.tabs(["📝 Reference Code", "✏️ Your Code Editor", "▶️ Run Reference"])
+
+    with proj_tab_code:
+        st.code(project["code"], language="python")
+        if st.button("📋 Copy to Editor", key=f"copy_proj_{project_choice}"):
+            st.session_state[f"proj_editor_{project_choice}"] = project["code"]
+            st.rerun()
+
+    with proj_tab_editor:
+        st.info("Write your own implementation below. Use the reference code tab for guidance.")
+
+        editor_key = f"proj_editor_{project_choice}"
+        default_code = st.session_state.get(editor_key, f"# {project['title']}\n# Try writing your own version here!\n\n")
+
+        user_code = st.text_area(
+            "Your code:",
+            value=default_code,
+            height=400,
+            key=f"proj_textarea_{project_choice}",
+            placeholder="Write your Python code here...",
+        )
+
+        ed_col1, ed_col2, ed_col3 = st.columns([1, 1, 2])
+        with ed_col1:
+            run_user = st.button("▶️ Run Your Code", key=f"run_user_proj_{project_choice}", type="primary")
+        with ed_col2:
+            clear_user = st.button("🗑 Clear", key=f"clear_proj_{project_choice}")
+        with ed_col3:
+            pass
+
+        if run_user and user_code.strip():
+            output, error = run_code_safely(user_code)
+            if output:
+                st.success("Output:")
+                st.code(output, language="text")
+            if error:
+                st.error("Error:")
+                st.code(error, language="text")
+            if not output and not error:
+                st.warning("No output produced. Make sure your code calls print() or a main() function.")
+
+        if clear_user:
+            st.session_state[editor_key] = ""
+            st.rerun()
+
+    with proj_tab_run:
+        if st.button("▶️ Run Reference Code", key=f"run_ref_proj_{project_choice}", type="primary"):
+            output, error = run_code_safely(project["code"])
+            if output:
+                st.success("Output:")
+                st.code(output, language="text")
+            if error:
+                st.error("Error:")
+                st.code(error, language="text")
 
 # Footer
 st.divider()
