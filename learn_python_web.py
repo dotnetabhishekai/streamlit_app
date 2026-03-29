@@ -1212,4 +1212,4 @@ if app_mode == "🛠️ Practice Projects":
 
 # Footer
 st.divider()
-st.caption("Made by [dotnetabhishekai](https://github.com/dotnetabhishekai)")
+st.caption("Made by [abhishek]")
